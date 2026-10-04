@@ -85,4 +85,6 @@ Add `NSPhotoLibraryUsageDescription` to `Info.plist`.
   - iOS simulator: `xcrun simctl privacy <device> grant photos dev.noegnh.filmkitPickerExample`.
 
   The tests add two samples to the library (`filmkit_picker_sample.jpg` and `.mp4`) once, and find them again on later runs.
-- CI (`.github/workflows/ci.yml`): format, analysis and Dart tests; Android build; the integration tests on an Android emulator and an iOS simulator.
+
+  On iOS simulators, `flutter test` often never sees the app start (flutter/flutter#181771). The CI runs the same tests through XCTest instead, with `example/ios/RunnerTests/RunnerTests.m`: `flutter build ios --config-only --simulator --debug integration_test/picker_test.dart`, then `xcodebuild test -workspace ios/Runner.xcworkspace -scheme Runner -destination 'platform=iOS Simulator,name=<device>' -only-testing:RunnerTests`.
+- CI (`.github/workflows/ci.yml`): format, analysis and Dart tests; Android build; the integration tests on an Android emulator and an iOS simulator (through XCTest).

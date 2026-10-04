@@ -63,7 +63,7 @@ void main() {
   });
 
   group('PhotoManagerLibrary', () {
-    test('lists the "all" album first, newest first', () async {
+    testWidgets('lists the "all" album first, newest first', (tester) async {
       final albums = await library.albums(PickerMediaType.all);
       expect(albums.first.isAll, isTrue);
       expect(albums.first.count, greaterThanOrEqualTo(2));
@@ -74,20 +74,20 @@ void main() {
       }
     });
 
-    test('filters photos and videos', () async {
+    testWidgets('filters photos and videos', (tester) async {
       final photos = (await library.albums(PickerMediaType.photos)).first;
       final videos = (await library.albums(PickerMediaType.videos)).first;
       expect(await library.items(photos, page: 0, size: 500), isNot(contains(video)));
       expect(await library.items(videos, page: 0, size: 500), everyElement(predicate<MediaItem>((i) => i.isVideo)));
     });
 
-    test('gives displayed sizes and video durations', () {
+    testWidgets('gives displayed sizes and video durations', (tester) async {
       expect((photo.width, photo.height, photo.isVideo), (300, 200, false));
       expect((video.width, video.height, video.isVideo), (640, 360, true));
       expect(video.duration.inSeconds, inInclusiveRange(5, 6));
     });
 
-    test('makes oriented thumbnails', () async {
+    testWidgets('makes oriented thumbnails', (tester) async {
       Future<ui.Image> decode(Uint8List? bytes) async => (await (await ui.instantiateImageCodec(bytes!)).getNextFrame()).image;
       final fit = await decode(await library.thumbnail(photo, width: 150, height: 100));
       expect(fit.width / fit.height, closeTo(1.5, 0.05), reason: 'oriented, aspect kept');
@@ -98,7 +98,7 @@ void main() {
       expect(cell.height, greaterThanOrEqualTo(128));
     });
 
-    test('reads the files', () async {
+    testWidgets('reads the files', (tester) async {
       final photoPath = await library.file(photo);
       final videoPath = await library.file(video);
       expect(File(photoPath!).lengthSync(), greaterThan(0));

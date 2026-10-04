@@ -97,7 +97,7 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
-      - run: flutter build ios --simulator --debug
+      - run: flutter pub get
         working-directory: example
       - name: Boot a simulator
         id: simulator
@@ -120,16 +120,12 @@ jobs:
           xcrun simctl privacy "$udid" grant photos dev.noegnh.filmkitPickerExample
           flutter devices
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
-      # With a watchdog that retries when flutter test misses the app's start
-      # (flutter/flutter#181771).
+      # Through XCTest (example/ios/RunnerTests/RunnerTests.m): flutter test often misses the
+      # app's VM service on iOS simulators and waits forever (flutter/flutter#181771).
       - name: Integration tests
         timeout-minutes: 45
-        run: ../.github/scripts/ios_integration_tests.sh ${{ steps.simulator.outputs.udid }}
         working-directory: example
-      - name: Upload the diagnostics of hung attempts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-diagnostics
-          path: example/build/ios_diagnostics
-          if-no-files-found: ignore
+        run: |
+          flutter build ios --config-only --simulator --debug integration_test/picker_test.dart
+          xcodebuild test -workspace ios/Runner.xcworkspace -scheme Runner -destination "id=${{ steps.simulator.outputs.udid }}" \
+            -only-testing:RunnerTests -parallel-testing-enabled NO -quiet
