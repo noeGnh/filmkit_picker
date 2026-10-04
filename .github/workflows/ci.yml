@@ -1,0 +1,166 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The Flutter version the package is developed with (Gradle 9.3.1, AGP 9.1.0, Kotlin 2.4.0).
+  FLUTTER_VERSION: 3.47.2
+
+jobs:
+  dart:
+    name: Analyze and Dart tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test example/lib example/integration_test
+      - run: flutter analyze
+      - run: flutter analyze
+        working-directory: example
+      - run: flutter test --coverage
+
+  android:
+    name: Android build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - uses: gradle/actions/setup-gradle@v5
+      - run: flutter build apk --debug
+        working-directory: example
+
+  android-integration:
+    name: Android integration tests (emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - uses: gradle/actions/setup-gradle@v5
+      # Built before the emulator starts, then installed there to give it the photo access
+      # (flutter test reinstalls it and keeps the permissions).
+      - run: flutter build apk --debug
+        working-directory: example
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disk-size: 6000M
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          disable-animations: true
+          working-directory: example
+          script: |
+            adb install -r build/app/outputs/flutter-apk/app-debug.apk
+            adb shell pm grant dev.noegnh.filmkit_picker_example android.permission.READ_MEDIA_IMAGES
+            adb shell pm grant dev.noegnh.filmkit_picker_example android.permission.READ_MEDIA_VIDEO
+            flutter test integration_test/picker_test.dart
+
+  ios:
+    name: iOS build and integration tests (simulator)
+    runs-on: macos-26
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+        working-directory: example
+      - name: Boot a simulator
+        id: simulator
+        run: |
+          # An iPhone of the runtime matching the active Xcode's SDK: Flutter only lists those.
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          echo "Xcode: $(xcodebuild -version | head -1), simulator SDK $sdk"
+          udid=$(xcrun simctl list devices available --json | SDK="$sdk" python3 -c "
+          import json, os, sys
+          runtime = 'iOS-' + os.environ['SDK'].replace('.', '-')
+          devices = json.load(sys.stdin)['devices']
+          matches = [d for r, ds in devices.items() if r.endswith(runtime) for d in ds if d['name'].startswith('iPhone')]
+          if not matches:
+              sys.exit('No iPhone simulator for ' + runtime + ' in ' + ', '.join(devices))
+          print(matches[-1]['udid'])
+          ")
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid"
+          flutter devices
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+      # Through XCTest (example/ios/RunnerTests/RunnerTests.m): flutter test often misses the
+      # app's VM service on iOS simulators and waits forever (flutter/flutter#181771).
+      - name: Build the integration tests
+        working-directory: example
+        run: |
+          flutter build ios --config-only --simulator --debug integration_test/picker_test.dart
+          xcodebuild build-for-testing -workspace ios/Runner.xcworkspace -scheme Runner \
+            -destination "id=${{ steps.simulator.outputs.udid }}" -derivedDataPath build/xctest -quiet
+      - name: Integration tests
+        timeout-minutes: 30
+        working-directory: example
+        env:
+          UDID: ${{ steps.simulator.outputs.udid }}
+        run: |
+          # Installed first so that the photo access is given to it: the tests can't answer the
+          # system prompt.
+          app=dev.noegnh.filmkitPickerExample
+          xcrun simctl install "$UDID" build/xctest/Build/Products/Debug-iphonesimulator/Runner.app
+          xcrun simctl privacy "$UDID" grant photos "$app"
+          # On the runner's iOS 26.5 simulator, simctl writes the access with auth_version 1 and
+          # the app still asks for full access: it's rewritten with auth_version 2 (as simctl does
+          # for iOS 27) in the simulator's TCC database, and the simulator restarted to read it.
+          db=~/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/TCC/TCC.db
+          query="select service, auth_value, auth_reason, auth_version from access where client = '$app'"
+          echo "TCC after simctl privacy: $(sqlite3 "$db" "$query")"
+          sqlite3 "$db" "insert or replace into access (service, client, client_type, auth_value, auth_reason, auth_version, flags)
+            values ('kTCCServicePhotos', '$app', 0, 2, 4, 2, 0)"
+          xcrun simctl shutdown "$UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID"
+          echo "TCC: $(sqlite3 "$db" "$query")"
+          # A screenshot a minute, uploaded if the tests fail.
+          mkdir -p build/ios_diagnostics
+          (while sleep 60; do xcrun simctl io "$UDID" screenshot "build/ios_diagnostics/$(date +%H%M%S).png" >/dev/null 2>&1; done) &
+          # The Dart tests' progress ("flutter: ...") and XCTest's results.
+          xcodebuild test-without-building -xctestrun build/xctest/Build/Products/*.xctestrun -destination "id=$UDID" \
+            -only-testing:RunnerTests -parallel-testing-enabled NO 2>&1 |
+            grep -E 'flutter: |Test Case|Executed|error|TEST|Testing failed|timed out'
+          exit "${PIPESTATUS[0]}"
+      - name: Upload the simulator screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-diagnostics
+          path: example/build/ios_diagnostics
+          if-no-files-found: ignore
