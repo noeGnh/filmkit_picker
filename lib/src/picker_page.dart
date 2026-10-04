@@ -1,16 +1,20 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:filmkit/filmkit.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import 'camera_capture.dart';
 import 'media_library.dart';
 import 'media_thumbnail.dart';
 import 'photo_manager_library.dart';
 import 'picked_media.dart';
 import 'picker_options.dart';
+
+enum _Tab { gallery, photo, video }
 
 /// Called with the picked media when the user taps Next. Its result is popped, unless it's
 /// `null`: the picker then stays open with the same selection (e.g. the user closed the editor).
@@ -61,6 +65,15 @@ class _FilmkitPickerPageState extends State<FilmkitPickerPage> with WidgetsBindi
   bool _submitting = false;
 
   final _videoPreview = GlobalKey<_VideoPreviewState>();
+  final _camera = GlobalKey<CameraCaptureState>();
+
+  /// The gallery, then the camera tabs the options ask for.
+  late final List<_Tab> _tabs = [
+    _Tab.gallery,
+    if (_options.camera && _options.type != PickerMediaType.videos) _Tab.photo,
+    if (_options.camera && _options.type != PickerMediaType.photos) _Tab.video,
+  ];
+  _Tab _tab = _Tab.gallery;
 
   @override
   void initState() {
@@ -229,14 +242,70 @@ class _FilmkitPickerPageState extends State<FilmkitPickerPage> with WidgetsBindi
         }
         picked.add(PickedMedia(item: item, path: path, crop: _cropOf(item)));
       }
-      final onNext = widget.onNext;
-      final result = onNext == null ? picked : await onNext(context, picked);
-      if (mounted && result != null) Navigator.of(context).pop(result);
+      await _submit(picked);
     } finally {
       if (mounted) {
         setState(() => _submitting = false);
         _videoPreview.currentState?.play();
       }
+    }
+  }
+
+  /// Hands [picked] to [FilmkitPickerPage.onNext] and pops its result; returns whether it did.
+  Future<bool> _submit(List<PickedMedia> picked) async {
+    final onNext = widget.onNext;
+    final result = onNext == null ? picked : await onNext(context, picked);
+    if (!mounted || result == null) return false;
+    Navigator.of(context).pop(result);
+    return true;
+  }
+
+  /// A photo taken or a video recorded: picked at once, alone, with the current ratio.
+  Future<void> _onCaptured(Capture capture) async {
+    final probed = await _probe(capture);
+    if (!mounted) return;
+    if (probed == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_texts.loadFailed)));
+      return;
+    }
+    var item = probed;
+    var saved = false;
+    if (_options.saveCaptures) {
+      final added = await _library.saveCapture(capture.path, isVideo: capture.isVideo);
+      if (added != null) {
+        saved = true;
+        item = MediaItem(id: added.id, isVideo: probed.isVideo, width: probed.width, height: probed.height, duration: probed.duration, source: added.source);
+      }
+    }
+    if (!mounted) return;
+    final crop = CropState(mediaAspect: item.aspect, aspect: _aspect);
+    // The camera is released while the editor is open.
+    _camera.currentState?.pause();
+    final popped = await _submit([PickedMedia(item: item, path: capture.path, crop: crop)]);
+    if (popped || !mounted) return;
+    // Closed from the editor: back to the camera; a capture that wasn't kept is deleted.
+    if (!saved) unawaited(File(capture.path).delete().then<void>((_) {}, onError: (_) {}));
+    _camera.currentState?.resume();
+  }
+
+  /// The displayed size (and duration) of a capture, `null` if it can't be read.
+  static Future<MediaItem?> _probe(Capture capture) async {
+    final id = 'capture:${capture.path}';
+    try {
+      if (capture.isVideo) {
+        final info = await Filmkit.getVideoInfo(capture.path);
+        return MediaItem(id: id, isVideo: true, width: info.width, height: info.height, duration: info.duration);
+      }
+      // Decoded small: only the oriented aspect matters (Flutter applies the EXIF orientation).
+      final bytes = await File(capture.path).readAsBytes();
+      final codec = await ui.instantiateImageCodec(bytes, targetWidth: 64);
+      final image = (await codec.getNextFrame()).image;
+      codec.dispose();
+      final item = MediaItem(id: id, isVideo: false, width: image.width, height: image.height);
+      image.dispose();
+      return item;
+    } on Object {
+      return null;
     }
   }
 
@@ -249,9 +318,11 @@ class _FilmkitPickerPageState extends State<FilmkitPickerPage> with WidgetsBindi
           appBar: AppBar(
             backgroundColor: Colors.black,
             leading: IconButton(key: const ValueKey('filmkit_picker.close'), icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
-            title: _album == null ? null : _albumButton(context),
+            title: _tab != _Tab.gallery || _album == null ? null : _albumButton(context),
             actions: [
-              if (_submitting)
+              if (_tab != _Tab.gallery)
+                const SizedBox()
+              else if (_submitting)
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20),
                   child: SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)),
@@ -265,7 +336,12 @@ class _FilmkitPickerPageState extends State<FilmkitPickerPage> with WidgetsBindi
                 ),
             ],
           ),
-          body: _body(),
+          body: Column(
+            children: [
+              Expanded(child: _tab == _Tab.gallery ? _body() : _cameraTab()),
+              if (_tabs.length > 1) _tabBar(),
+            ],
+          ),
         ),
       ),
     );
@@ -308,6 +384,47 @@ class _FilmkitPickerPageState extends State<FilmkitPickerPage> with WidgetsBindi
       ),
     );
     if (album != null && album != _album) await _openAlbum(album);
+  }
+
+  Widget _cameraTab() {
+    return CameraCapture(
+      key: _camera,
+      video: _tab == _Tab.video,
+      texts: _texts,
+      maxVideoDuration: _options.maxVideoDuration,
+      onCaptured: _onCaptured,
+      onOpenSettings: _library.openSettings,
+    );
+  }
+
+  Widget _tabBar() {
+    String label(_Tab tab) => switch (tab) {
+      _Tab.gallery => _texts.gallery,
+      _Tab.photo => _texts.photo,
+      _Tab.video => _texts.video,
+    };
+    return SafeArea(
+      top: false,
+      child: SizedBox(
+        height: 48,
+        child: Row(
+          children: [
+            for (final tab in _tabs)
+              Expanded(
+                child: TextButton(
+                  key: ValueKey('filmkit_picker.tab.${tab.name}'),
+                  style: TextButton.styleFrom(foregroundColor: tab == _tab ? Colors.white : Colors.white54),
+                  onPressed: tab == _tab || _submitting ? null : () => setState(() => _tab = tab),
+                  child: Text(
+                    label(tab),
+                    style: TextStyle(fontWeight: tab == _tab ? FontWeight.bold : FontWeight.normal, color: tab == _tab ? Colors.white : Colors.white54),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _body() {

@@ -86,6 +86,8 @@ jobs:
             adb install -r build/app/outputs/flutter-apk/app-debug.apk
             adb shell pm grant dev.noegnh.filmkit_picker_example android.permission.READ_MEDIA_IMAGES
             adb shell pm grant dev.noegnh.filmkit_picker_example android.permission.READ_MEDIA_VIDEO
+            adb shell pm grant dev.noegnh.filmkit_picker_example android.permission.CAMERA
+            adb shell pm grant dev.noegnh.filmkit_picker_example android.permission.RECORD_AUDIO
             flutter test integration_test/picker_test.dart
 
   ios:

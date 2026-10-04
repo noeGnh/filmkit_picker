@@ -55,15 +55,7 @@ class PhotoManagerLibrary implements MediaLibrary {
     final assets = await (album.source! as AssetPathEntity).getAssetListPaged(page: page, size: size);
     return [
       for (final asset in assets)
-        if (asset.type == AssetType.image || asset.type == AssetType.video)
-          MediaItem(
-            id: asset.id,
-            isVideo: asset.type == AssetType.video,
-            width: asset.orientatedWidth,
-            height: asset.orientatedHeight,
-            duration: asset.videoDuration,
-            source: asset,
-          ),
+        if (asset.type == AssetType.image || asset.type == AssetType.video) _item(asset),
     ];
   }
 
@@ -83,6 +75,25 @@ class PhotoManagerLibrary implements MediaLibrary {
         : ThumbnailOption(size: size, quality: 90);
     return asset.thumbnailDataWithOption(option);
   }
+
+  @override
+  Future<MediaItem?> saveCapture(String path, {required bool isVideo}) async {
+    try {
+      final asset = isVideo ? await PhotoManager.editor.saveVideo(File(path)) : await PhotoManager.editor.saveImageWithPath(path);
+      return _item(asset);
+    } on Exception {
+      return null;
+    }
+  }
+
+  static MediaItem _item(AssetEntity asset) => MediaItem(
+    id: asset.id,
+    isVideo: asset.type == AssetType.video,
+    width: asset.orientatedWidth,
+    height: asset.orientatedHeight,
+    duration: asset.videoDuration,
+    source: asset,
+  );
 
   @override
   Future<String?> file(MediaItem item) async => (await (item.source! as AssetEntity).file)?.path;
