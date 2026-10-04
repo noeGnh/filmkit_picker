@@ -1,7 +1,12 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'dart:io';
+import 'dart:ui' as ui;
+
+import 'package:camera_platform_interface/camera_platform_interface.dart';
+import 'package:filmkit/filmkit.dart';
 import 'package:filmkit_picker/filmkit_picker.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 
@@ -29,6 +34,9 @@ class FakeLibrary implements MediaLibrary {
 
   /// Items whose file can't be read.
   final unreadable = <String>{};
+
+  /// Captures added by [saveCapture].
+  final savedCaptures = <String>[];
 
   int permissionRequests = 0;
   int limitedManaged = 0;
@@ -65,6 +73,12 @@ class FakeLibrary implements MediaLibrary {
 
   @override
   Future<String?> file(MediaItem item) async => unreadable.contains(item.id) ? null : '/media/${item.id}.${item.isVideo ? 'mp4' : 'jpg'}';
+
+  @override
+  Future<MediaItem?> saveCapture(String path, {required bool isVideo}) async {
+    savedCaptures.add(path);
+    return MediaItem(id: 'saved${savedCaptures.length}', isVideo: isVideo, width: 0, height: 0);
+  }
 
   @override
   Future<void> manageLimitedAccess(PickerMediaType type) async => limitedManaged++;
@@ -136,4 +150,114 @@ class FakeVideoPlayer extends VideoPlayerPlatform {
 
   @override
   Widget buildViewWithOptions(VideoViewOptions options) => const SizedBox.expand();
+}
+
+/// A PNG of [width] × [height].
+Future<List<int>> pngBytes(int width, int height) async {
+  final recorder = ui.PictureRecorder();
+  ui.Canvas(recorder).drawColor(const ui.Color(0xFF336699), ui.BlendMode.src);
+  final image = await recorder.endRecording().toImage(width, height);
+  final data = await image.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  return data!.buffer.asUint8List();
+}
+
+/// Cameras that take [photo] as pictures (written to [dir]) and record a video file, recording
+/// the calls.
+class FakeCamera extends CameraPlatform {
+  FakeCamera({required this.dir, required this.photo, this.cameras = const [back, front], this.initError});
+
+  static const back = CameraDescription(name: 'back', lensDirection: CameraLensDirection.back, sensorOrientation: 90);
+  static const front = CameraDescription(name: 'front', lensDirection: CameraLensDirection.front, sensorOrientation: 270);
+
+  final Directory dir;
+  final List<int> photo;
+  final List<CameraDescription> cameras;
+
+  /// Thrown by [initializeCamera], e.g. `CameraException('CameraAccessDenied', ...)`.
+  final CameraException? initError;
+
+  final created = <(String, bool)>[];
+  final flashModes = <FlashMode>[];
+  final disposed = <int>[];
+  int pictures = 0;
+  bool recording = false;
+  int _next = 0;
+  final _initialized = <int, StreamController<CameraInitializedEvent>>{};
+
+  @override
+  Future<List<CameraDescription>> availableCameras() async => cameras;
+
+  @override
+  Future<int> createCameraWithSettings(CameraDescription cameraDescription, MediaSettings mediaSettings) async {
+    created.add((cameraDescription.name, mediaSettings.enableAudio));
+    final id = _next++;
+    _initialized[id] = StreamController<CameraInitializedEvent>.broadcast();
+    return id;
+  }
+
+  @override
+  Future<void> initializeCamera(int cameraId, {ImageFormatGroup imageFormatGroup = ImageFormatGroup.unknown}) async {
+    if (initError != null) throw initError!;
+    scheduleMicrotask(
+      () => _initialized[cameraId]!.add(
+        CameraInitializedEvent(cameraId, 1920, 1080, ExposureMode.auto, true, FocusMode.auto, true),
+      ),
+    );
+  }
+
+  @override
+  Stream<CameraInitializedEvent> onCameraInitialized(int cameraId) => _initialized[cameraId]!.stream;
+
+  @override
+  Stream<CameraErrorEvent> onCameraError(int cameraId) => StreamController<CameraErrorEvent>.broadcast().stream; // never fires
+
+  @override
+  Stream<CameraClosingEvent> onCameraClosing(int cameraId) => StreamController<CameraClosingEvent>.broadcast().stream; // never fires
+
+  @override
+  Stream<CameraResolutionChangedEvent> onCameraResolutionChanged(int cameraId) => StreamController<CameraResolutionChangedEvent>.broadcast().stream; // never fires
+
+  @override
+  Stream<DeviceOrientationChangedEvent> onDeviceOrientationChanged() => StreamController<DeviceOrientationChangedEvent>.broadcast().stream; // never fires
+
+  @override
+  Future<void> setFlashMode(int cameraId, FlashMode mode) async => flashModes.add(mode);
+
+  @override
+  Future<XFile> takePicture(int cameraId) async {
+    pictures++;
+    final file = File('${dir.path}/photo_$pictures.png')..writeAsBytesSync(photo);
+    return XFile(file.path);
+  }
+
+  @override
+  Future<void> prepareForVideoRecording() async {}
+
+  @override
+  Future<void> startVideoCapturing(VideoCaptureOptions options) async => recording = true;
+
+  @override
+  Future<XFile> stopVideoRecording(int cameraId) async {
+    recording = false;
+    final file = File('${dir.path}/video.mp4')..writeAsStringSync('mp4');
+    return XFile(file.path);
+  }
+
+  @override
+  Widget buildPreview(int cameraId) => const SizedBox.expand(key: ValueKey('fake.preview'));
+
+  @override
+  Future<void> dispose(int cameraId) async {
+    // The stream stays open: the controller may still be waiting for its first event.
+    disposed.add(cameraId);
+  }
+}
+
+/// filmkit's native side for the picker: video info only.
+class FakeFilmkit extends FilmkitPlatform {
+  VideoInfo videoInfo = const VideoInfo(width: 1080, height: 1920, duration: Duration(seconds: 4), hasAudio: true, isHdr: false);
+
+  @override
+  Future<VideoInfo> getVideoInfo(String path) async => videoInfo;
 }

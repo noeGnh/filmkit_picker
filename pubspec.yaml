@@ -1,15 +1,15 @@
 name: filmkit_picker
 description: "Instagram-style photo and video picker for Flutter: gallery grid, albums, single or multiple selection with a crop preview, then filmkit's editor."
-version: 0.1.0
+version: 0.2.0
 homepage: https://github.com/noeGnh/filmkit_picker
 repository: https://github.com/noeGnh/filmkit_picker
 issue_tracker: https://github.com/noeGnh/filmkit_picker/issues
 topics:
   - picker
   - gallery
-  - image
   - video
   - editor
+  - camera
 
 screenshots:
   - description: The picker, with the crop preview over the gallery.
@@ -31,9 +31,11 @@ dependencies:
   filmkit: ^0.7.0
   photo_manager: ^3.12.0
   video_player: ^2.14.1
+  camera: ^0.12.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
   video_player_platform_interface: ^6.9.0
+  camera_platform_interface: ^2.14.0

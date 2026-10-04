@@ -93,6 +93,10 @@ abstract class MediaLibrary {
   /// The file of [item], downloaded first when it's in the cloud; `null` if it can't be read.
   Future<String?> file(MediaItem item);
 
+  /// Adds the photo or video at [path] (just taken with the camera) to the library and returns
+  /// it, `null` if it couldn't be added.
+  Future<MediaItem?> saveCapture(String path, {required bool isVideo});
+
   /// With limited access: lets the user change which media the app can see.
   Future<void> manageLimitedAccess(PickerMediaType type);
 

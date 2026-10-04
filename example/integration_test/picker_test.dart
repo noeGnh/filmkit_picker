@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:camera/camera.dart';
 import 'package:filmkit/filmkit.dart';
 import 'package:filmkit_picker/filmkit_picker.dart';
 import 'package:flutter/material.dart';
@@ -223,6 +224,42 @@ void main() {
       final videoInfo = await Filmkit.getVideoInfo(results[1].export!.path);
       expect(videoInfo.width, videoInfo.height);
       expect(videoInfo.width, 360);
+    });
+
+    // Needs a camera (the Android emulator's is emulated; the iOS simulator has none) and its
+    // access given beforehand (`pm grant ... CAMERA` and `RECORD_AUDIO`).
+    testWidgets('takes a photo and records a video with the camera', (tester) async {
+      if ((await availableCameras()).isEmpty) {
+        markTestSkipped('no camera');
+        return;
+      }
+      Future<PickedMedia> capture(String tab, {Duration recording = Duration.zero}) async {
+        final picker = await openPicker(tester, (context) => FilmkitPicker.pick(context, options: const PickerOptions(camera: true)));
+        await tester.tap(key('tab.$tab'));
+        await pumpUntilFound(tester, key('camera.preview'));
+        await pumpFor(tester, const Duration(seconds: 1));
+        await tester.tap(key('camera.shutter'));
+        if (recording > Duration.zero) {
+          await pumpFor(tester, recording);
+          await tester.tap(key('camera.shutter'));
+        }
+        await pumpUntilFound(tester, find.byKey(const ValueKey('open')));
+        // The picker's closing transition.
+        await pumpFor(tester, const Duration(seconds: 1));
+        return (picker.result()! as List<PickedMedia>).single;
+      }
+
+      final photo = await capture('photo');
+      expect(photo.isVideo, isFalse);
+      expect(File(photo.path).lengthSync(), greaterThan(0));
+      expect(photo.item.width, greaterThan(0));
+      expect(photo.aspect, CropAspect.square);
+
+      final video = await capture('video', recording: const Duration(seconds: 2));
+      expect(video.isVideo, isTrue);
+      final info = await Filmkit.getVideoInfo(video.path);
+      expect(info.duration.inMilliseconds, greaterThan(1000));
+      expect((video.item.width, video.item.height), (info.width, info.height));
     });
   });
 }

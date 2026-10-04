@@ -17,6 +17,16 @@ class PickerTexts {
     this.openSettings = 'Open settings',
     this.empty = 'No photos or videos',
     this.loadFailed = "Can't open this file",
+    this.gallery = 'Gallery',
+    this.photo = 'Photo',
+    this.video = 'Video',
+    this.takePhoto = 'Take photo',
+    this.record = 'Record',
+    this.flash = 'Flash',
+    this.switchCamera = 'Switch camera',
+    this.noCamera = 'No camera on this device',
+    this.cameraDenied = 'Allow access to the camera to take photos and videos.',
+    this.cameraFailed = "Can't open the camera",
   });
 
   final String next;
@@ -39,6 +49,22 @@ class PickerTexts {
   /// Shown when a selected file can't be read (e.g. a cloud file without network).
   final String loadFailed;
 
+  /// Tab of the gallery, next to the camera tabs.
+  final String gallery;
+
+  /// Tab of the camera taking photos.
+  final String photo;
+
+  /// Tab of the camera recording videos.
+  final String video;
+  final String takePhoto;
+  final String record;
+  final String flash;
+  final String switchCamera;
+  final String noCamera;
+  final String cameraDenied;
+  final String cameraFailed;
+
   PickerTexts copyWith({
     String? next,
     String? selectMultiple,
@@ -50,6 +76,16 @@ class PickerTexts {
     String? openSettings,
     String? empty,
     String? loadFailed,
+    String? gallery,
+    String? photo,
+    String? video,
+    String? takePhoto,
+    String? record,
+    String? flash,
+    String? switchCamera,
+    String? noCamera,
+    String? cameraDenied,
+    String? cameraFailed,
   }) => PickerTexts(
     next: next ?? this.next,
     selectMultiple: selectMultiple ?? this.selectMultiple,
@@ -61,6 +97,16 @@ class PickerTexts {
     openSettings: openSettings ?? this.openSettings,
     empty: empty ?? this.empty,
     loadFailed: loadFailed ?? this.loadFailed,
+    gallery: gallery ?? this.gallery,
+    photo: photo ?? this.photo,
+    video: video ?? this.video,
+    takePhoto: takePhoto ?? this.takePhoto,
+    record: record ?? this.record,
+    flash: flash ?? this.flash,
+    switchCamera: switchCamera ?? this.switchCamera,
+    noCamera: noCamera ?? this.noCamera,
+    cameraDenied: cameraDenied ?? this.cameraDenied,
+    cameraFailed: cameraFailed ?? this.cameraFailed,
   );
 }
 
@@ -72,6 +118,9 @@ class PickerOptions {
     this.aspects = defaultAspects,
     this.columns = 4,
     this.pageSize = 80,
+    this.camera = false,
+    this.saveCaptures = false,
+    this.maxVideoDuration = const Duration(seconds: 60),
     this.texts = const PickerTexts(),
   }) : assert(maxCount >= 1),
        assert(columns >= 1),
@@ -95,14 +144,38 @@ class PickerOptions {
   /// Media loaded at a time while scrolling.
   final int pageSize;
 
+  /// Adds Photo and Video tabs next to the gallery (only the one matching [type] when it's
+  /// photos or videos only). A photo taken or a video recorded is picked at once, alone.
+  /// Needs the camera (and, for videos, microphone) usage descriptions on iOS.
+  final bool camera;
+
+  /// Also adds the photos and videos taken to the device's photo library.
+  final bool saveCaptures;
+
+  /// Recording stops by itself after this long; `null` for no limit.
+  final Duration? maxVideoDuration;
+
   final PickerTexts texts;
 
-  PickerOptions copyWith({PickerMediaType? type, int? maxCount, List<CropAspect>? aspects, int? columns, int? pageSize, PickerTexts? texts}) => PickerOptions(
+  PickerOptions copyWith({
+    PickerMediaType? type,
+    int? maxCount,
+    List<CropAspect>? aspects,
+    int? columns,
+    int? pageSize,
+    bool? camera,
+    bool? saveCaptures,
+    Duration? maxVideoDuration,
+    PickerTexts? texts,
+  }) => PickerOptions(
     type: type ?? this.type,
     maxCount: maxCount ?? this.maxCount,
     aspects: aspects ?? this.aspects,
     columns: columns ?? this.columns,
     pageSize: pageSize ?? this.pageSize,
+    camera: camera ?? this.camera,
+    saveCaptures: saveCaptures ?? this.saveCaptures,
+    maxVideoDuration: maxVideoDuration ?? this.maxVideoDuration,
     texts: texts ?? this.texts,
   );
 }

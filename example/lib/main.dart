@@ -16,10 +16,12 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   PickerMediaType _type = PickerMediaType.all;
   bool _multiple = true;
+  bool _camera = true;
+  bool _saveCaptures = false;
   List<PickedMedia> _picked = [];
   List<EditorResult> _edited = [];
 
-  PickerOptions get _options => PickerOptions(type: _type, maxCount: _multiple ? 10 : 1);
+  PickerOptions get _options => PickerOptions(type: _type, maxCount: _multiple ? 10 : 1, camera: _camera, saveCaptures: _saveCaptures);
 
   Future<void> _pick() async {
     final picked = await FilmkitPicker.pick(context, options: _options);
@@ -56,6 +58,12 @@ class _HomePageState extends State<HomePage> {
             onSelectionChanged: (s) => setState(() => _type = s.single),
           ),
           SwitchListTile(title: const Text('Multiple selection (up to 10)'), value: _multiple, onChanged: (v) => setState(() => _multiple = v)),
+          SwitchListTile(title: const Text('Camera tabs'), value: _camera, onChanged: (v) => setState(() => _camera = v)),
+          SwitchListTile(
+            title: const Text('Save captures to the gallery'),
+            value: _saveCaptures,
+            onChanged: _camera ? (v) => setState(() => _saveCaptures = v) : null,
+          ),
           FilledButton(key: const ValueKey('pick'), onPressed: _pick, child: const Text('Pick')),
           const SizedBox(height: 8),
           FilledButton(key: const ValueKey('pickAndEdit'), onPressed: _pickAndEdit, child: const Text('Pick and edit')),
