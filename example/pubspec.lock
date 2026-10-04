@@ -68,11 +68,10 @@ packages:
   filmkit:
     dependency: "direct main"
     description:
-      path: "."
-      ref: fa8fcf57d51514fa2b67f567908edb2db685d67a
-      resolved-ref: fa8fcf57d51514fa2b67f567908edb2db685d67a
-      url: "https://github.com/noeGnh/filmkit.git"
-    source: git
+      name: filmkit
+      sha256: ac5cd6cae1de40bc8de6d318150e346d391cb7dc5933bd6eb7274e2e8afe380e
+      url: "https://pub.dev"
+    source: hosted
     version: "0.7.0"
   filmkit_picker:
     dependency: "direct main"

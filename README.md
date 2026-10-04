@@ -2,7 +2,16 @@
 
 Instagram-style photo and video picker for Flutter: a crop preview over the gallery grid, albums, single or multiple selection, then [filmkit](https://pub.dev/packages/filmkit)'s editor on each picked media.
 
-> **Status**: 0.1, not yet on pub.dev (it needs filmkit 0.7). Tested on the Android emulator and the iOS simulator.
+> **Status**: 0.1. Tested on the Android emulator and the iOS simulator.
+
+<p>
+  <img src="doc/picker.jpg" width="200" alt="Picker">
+  <img src="doc/multiple.jpg" width="200" alt="Multiple selection">
+  <img src="doc/editor.jpg" width="200" alt="Editing in turn">
+  <img src="doc/video.jpg" width="200" alt="A video in the editor">
+</p>
+
+<sub>Photos from Wikimedia Commons, CC0: <a href="https://commons.wikimedia.org/wiki/File:Sunset,_Lone_Ranch_Beach,_Oregon.jpg">beach at sunset</a>, <a href="https://commons.wikimedia.org/wiki/File:Lake_Mountain_Landscape.jpg">mountain lake</a>, <a href="https://commons.wikimedia.org/wiki/File:Field_of_flowers_in_Hokkaido,_Japan.jpg">flower field</a>, <a href="https://commons.wikimedia.org/wiki/File:Sz%C3%A9chenyi_Chain_Bridge_in_Budapest_at_night.jpg">Chain Bridge at night</a>, <a href="https://commons.wikimedia.org/wiki/File:Cup_of_coffee_in_Caf%C3%A9_Butter_-_Prenzlauer_Berg,_Berlin.jpg">coffee</a>, <a href="https://commons.wikimedia.org/wiki/File:Forest_path_during_autumn.jpg">forest path</a>, <a href="https://commons.wikimedia.org/wiki/File:Tabby_cat_with_blue_eyes-3336579.jpg">cat</a>, <a href="https://commons.wikimedia.org/wiki/File:Peaceful_waterfall_(Unsplash).jpg">waterfall (the video)</a>, <a href="https://commons.wikimedia.org/wiki/File:Sossusvlei_Dunes_Namib.jpg">dunes</a>, <a href="https://commons.wikimedia.org/wiki/File:Boats_in_harbor_-_Picton,_NZ_-_DSC00341.jpg">harbor</a>, <a href="https://commons.wikimedia.org/wiki/File:Autumn_leaves,_Dumitru_Rascanu_park.jpg">autumn leaves</a>, <a href="https://commons.wikimedia.org/wiki/File:Piece_of_chocolate_cake_on_a_white_plate_decorated_with_chocolate_sauce.jpg">cake</a>, <a href="https://commons.wikimedia.org/wiki/File:Snow-capped_mountain_range.jpg">snowy mountains</a>, <a href="https://commons.wikimedia.org/wiki/File:Lighthouse_Chania_evening_sun.jpg">lighthouse</a>, <a href="https://commons.wikimedia.org/wiki/File:Bicycle_02.jpg">bicycle</a>, <a href="https://commons.wikimedia.org/wiki/File:Chateau_Frontenac_at_dusk_in_Quebec_City.jpg">Château Frontenac</a>.</sub>
 
 ## Pick and edit
 
