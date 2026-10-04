@@ -11,6 +11,16 @@ topics:
   - video
   - editor
 
+screenshots:
+  - description: The picker, with the crop preview over the gallery.
+    path: doc/picker.jpg
+  - description: Multiple selection in 4:5.
+    path: doc/multiple.jpg
+  - description: filmkit's editor on each picked media in turn.
+    path: doc/editor.jpg
+  - description: A picked video in the editor.
+    path: doc/video.jpg
+
 environment:
   sdk: ^3.13.2
   flutter: '>=3.47.0'
