@@ -69,7 +69,7 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: "feat/picker-support"
+      ref: fa8fcf57d51514fa2b67f567908edb2db685d67a
       resolved-ref: fa8fcf57d51514fa2b67f567908edb2db685d67a
       url: "https://github.com/noeGnh/filmkit.git"
     source: git

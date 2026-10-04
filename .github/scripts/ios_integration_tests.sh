@@ -8,6 +8,8 @@ set -uo pipefail
 
 udid=$1
 grace=${GRACE:-300}
+# Screenshots and logs of the attempts that hang, uploaded by the workflow.
+diag=${DIAG_DIR:-$PWD/build/ios_diagnostics}
 
 attempt() {
   local log
@@ -20,6 +22,12 @@ attempt() {
     if [ -n "$built" ] && ! grep -E ' \+[0-9]+( -[0-9]+)?: ' "$log" | grep -vq ': loading ' &&
       [ $(($(date +%s) - built)) -gt $grace ]; then
       echo "::warning::No test started ${grace}s after the build (flutter/flutter#181771): retrying."
+      # What the simulator shows and what the app logged, to tell a hang from a crash or an alert.
+      mkdir -p "$diag"
+      xcrun simctl io "$udid" screenshot "$diag/attempt_$n.png" || true
+      xcrun simctl spawn "$udid" log show --last "$((grace + 60))s" --style compact \
+        --predicate 'process == "Runner" OR eventMessage CONTAINS "filmkitPickerExample"' > "$diag/attempt_$n.log" 2>&1 || true
+      tail -n 40 "$diag/attempt_$n.log"
       pkill -f "flutter_tools.snapshot test" || true
       wait "$pid"
       xcrun simctl terminate "$udid" dev.noegnh.filmkitPickerExample 2>/dev/null || true

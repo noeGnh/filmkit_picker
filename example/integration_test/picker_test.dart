@@ -26,9 +26,12 @@ void main() {
 
   /// Finds a sample in the library by file name, or adds it.
   Future<AssetEntity> sample(String name, String asset, Future<AssetEntity> Function(Uint8List bytes) save) async {
-    final all = (await PhotoManager.getAssetPathList(onlyAll: true)).single;
-    for (final entity in await all.getAssetListRange(start: 0, end: await all.assetCountAsync)) {
-      if (await entity.titleAsync == name) return entity;
+    // No album at all in an empty library (a new emulator).
+    final all = (await PhotoManager.getAssetPathList(onlyAll: true)).firstOrNull;
+    if (all != null) {
+      for (final entity in await all.getAssetListRange(start: 0, end: await all.assetCountAsync)) {
+        if (await entity.titleAsync == name) return entity;
+      }
     }
     final data = await rootBundle.load('assets/$asset');
     return save(data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes));
