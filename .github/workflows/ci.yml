@@ -116,16 +116,38 @@ jobs:
           ")
           xcrun simctl boot "$udid"
           xcrun simctl bootstatus "$udid"
-          # The tests can't answer the photo access prompt.
-          xcrun simctl privacy "$udid" grant photos dev.noegnh.filmkitPickerExample
           flutter devices
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
       # Through XCTest (example/ios/RunnerTests/RunnerTests.m): flutter test often misses the
       # app's VM service on iOS simulators and waits forever (flutter/flutter#181771).
-      - name: Integration tests
-        timeout-minutes: 45
+      - name: Build the integration tests
         working-directory: example
         run: |
           flutter build ios --config-only --simulator --debug integration_test/picker_test.dart
-          xcodebuild test -workspace ios/Runner.xcworkspace -scheme Runner -destination "id=${{ steps.simulator.outputs.udid }}" \
-            -only-testing:RunnerTests -parallel-testing-enabled NO -quiet
+          xcodebuild build-for-testing -workspace ios/Runner.xcworkspace -scheme Runner \
+            -destination "id=${{ steps.simulator.outputs.udid }}" -derivedDataPath build/xctest -quiet
+      - name: Integration tests
+        timeout-minutes: 30
+        working-directory: example
+        env:
+          UDID: ${{ steps.simulator.outputs.udid }}
+        run: |
+          # Installed first so that the photo access is given to it: the tests can't answer the
+          # system prompt.
+          xcrun simctl install "$UDID" build/xctest/Build/Products/Debug-iphonesimulator/Runner.app
+          xcrun simctl privacy "$UDID" grant photos dev.noegnh.filmkitPickerExample
+          # A screenshot a minute, uploaded if the tests fail.
+          mkdir -p build/ios_diagnostics
+          (while sleep 60; do xcrun simctl io "$UDID" screenshot "build/ios_diagnostics/$(date +%H%M%S).png" >/dev/null 2>&1; done) &
+          # The Dart tests' progress ("flutter: ...") and XCTest's results.
+          xcodebuild test-without-building -xctestrun build/xctest/Build/Products/*.xctestrun -destination "id=$UDID" \
+            -only-testing:RunnerTests -parallel-testing-enabled NO 2>&1 |
+            grep -E 'flutter: |Test Case|Executed|error|TEST|Testing failed|timed out'
+          exit "${PIPESTATUS[0]}"
+      - name: Upload the simulator screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-diagnostics
+          path: example/build/ios_diagnostics
+          if-no-files-found: ignore
