@@ -2,7 +2,7 @@
 
 Instagram-style photo and video picker for Flutter: a crop preview over the gallery grid, albums, single or multiple selection, then [filmkit](https://pub.dev/packages/filmkit)'s editor on each picked media.
 
-> **Status**: 0.1, not yet on pub.dev (it needs filmkit 0.7). Tested on the Android emulator and the iOS simulator.
+> **Status**: 0.1. Tested on the Android emulator and the iOS simulator.
 
 ## Pick and edit
 
