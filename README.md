@@ -81,7 +81,7 @@ Add `NSPhotoLibraryUsageDescription` to `Info.plist`.
 
 - Dart tests: `flutter test`. The picker runs against a fake `MediaLibrary` and video player, see `test/fakes.dart`.
 - Integration tests run on a device against the real photo library: `flutter test integration_test/picker_test.dart -d <device>` in `example`. Access must be given first, because a test can't answer the system prompt:
-  - Android: `adb shell pm grant dev.noegnh.filmkit_picker_example android.permission.READ_MEDIA_IMAGES`, the same for `READ_MEDIA_VIDEO`, with the app installed.
+  - Android: install the app (`flutter build apk --debug`, `adb install -r build/app/outputs/flutter-apk/app-debug.apk`), then `adb shell pm grant dev.noegnh.filmkit_picker_example android.permission.READ_MEDIA_IMAGES`, and the same for `READ_MEDIA_VIDEO`. `flutter test` reinstalls the app and keeps the access, but uninstalls it at the end: repeat before each run.
   - iOS simulator: `xcrun simctl privacy <device> grant photos dev.noegnh.filmkitPickerExample`.
 
   The tests add two samples to the library (`filmkit_picker_sample.jpg` and `.mp4`) once, and find them again on later runs.

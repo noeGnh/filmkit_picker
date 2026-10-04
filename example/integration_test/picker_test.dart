@@ -149,6 +149,21 @@ void main() {
       return (closed: () => closed, result: () => result);
     }
 
+    /// Taps the editor's Done (or Next) once the media is loaded: it's disabled until then.
+    Future<void> tapDone(WidgetTester tester) async {
+      final done = find.byKey(const ValueKey('filmkit.done'));
+      final end = DateTime.now().add(const Duration(minutes: 1));
+      // One editor at a time: the previous one may still be leaving.
+      while ((done.evaluate().length != 1 || tester.widget<TextButton>(done).onPressed == null) && DateTime.now().isBefore(end)) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(tester.widget<TextButton>(done).onPressed, isNotNull, reason: 'editor loaded');
+      // The route transition.
+      await pumpFor(tester, const Duration(milliseconds: 600));
+      await tester.tap(done);
+      await tester.pump();
+    }
+
     Future<void> tapItem(WidgetTester tester, MediaItem item) async {
       final finder = key('item.${item.id}');
       await tester.scrollUntilVisible(
@@ -193,13 +208,11 @@ void main() {
 
       await tester.tap(key('next'));
       await pumpUntilFound(tester, find.text('1/2'));
-      await pumpUntilFound(tester, find.text('Next'));
-      final done = find.byKey(const ValueKey('filmkit.done'));
-      await pumpFor(tester, const Duration(seconds: 2));
-      await tester.tap(done);
+      expect(find.text('Next'), findsOneWidget, reason: 'Done reads Next before the last media');
+      await tapDone(tester);
       await pumpUntilFound(tester, find.text('2/2'));
-      await pumpFor(tester, const Duration(seconds: 3));
-      await tester.tap(done);
+      expect(find.text('Done'), findsOneWidget);
+      await tapDone(tester);
       await pumpUntilFound(tester, find.byKey(const ValueKey('open')), timeout: const Duration(minutes: 3));
 
       final results = picker.result()! as List<EditorResult>;

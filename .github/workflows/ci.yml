@@ -134,8 +134,21 @@ jobs:
         run: |
           # Installed first so that the photo access is given to it: the tests can't answer the
           # system prompt.
+          app=dev.noegnh.filmkitPickerExample
           xcrun simctl install "$UDID" build/xctest/Build/Products/Debug-iphonesimulator/Runner.app
-          xcrun simctl privacy "$UDID" grant photos dev.noegnh.filmkitPickerExample
+          xcrun simctl privacy "$UDID" grant photos "$app"
+          # On the runner's iOS 26 simulator the grant above isn't enough (the prompt still shows):
+          # the access is also written to the simulator's TCC database, as simctl writes it on
+          # iOS 27, and the simulator restarted to read it.
+          db=~/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/TCC/TCC.db
+          query="select service, auth_value, auth_reason, auth_version from access where client = '$app'"
+          echo "TCC after simctl privacy: $(sqlite3 "$db" "$query")"
+          sqlite3 "$db" "insert or replace into access (service, client, client_type, auth_value, auth_reason, auth_version, flags)
+            values ('kTCCServicePhotos', '$app', 0, 2, 4, 2, 0)"
+          xcrun simctl shutdown "$UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID"
+          echo "TCC: $(sqlite3 "$db" "$query")"
           # A screenshot a minute, uploaded if the tests fail.
           mkdir -p build/ios_diagnostics
           (while sleep 60; do xcrun simctl io "$UDID" screenshot "build/ios_diagnostics/$(date +%H%M%S).png" >/dev/null 2>&1; done) &
