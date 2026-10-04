@@ -137,9 +137,9 @@ jobs:
           app=dev.noegnh.filmkitPickerExample
           xcrun simctl install "$UDID" build/xctest/Build/Products/Debug-iphonesimulator/Runner.app
           xcrun simctl privacy "$UDID" grant photos "$app"
-          # On the runner's iOS 26 simulator the grant above isn't enough (the prompt still shows):
-          # the access is also written to the simulator's TCC database, as simctl writes it on
-          # iOS 27, and the simulator restarted to read it.
+          # On the runner's iOS 26.5 simulator, simctl writes the access with auth_version 1 and
+          # the app still asks for full access: it's rewritten with auth_version 2 (as simctl does
+          # for iOS 27) in the simulator's TCC database, and the simulator restarted to read it.
           db=~/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/TCC/TCC.db
           query="select service, auth_value, auth_reason, auth_version from access where client = '$app'"
           echo "TCC after simctl privacy: $(sqlite3 "$db" "$query")"
